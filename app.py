@@ -1,20 +1,48 @@
 import streamlit as st
 import pandas as pd
 import os
-# Database se sahi functions import kiye hain (add_user instead of register_user)
 from database import init_db, add_user, login_user
 
 # Database ko initialize karein
 init_db()
 
-# --- Page Configuration (Hamesha sab se upar hona chahiye) ---
+# --- Page Configuration ---
 st.set_page_config(page_title="Medical NLP Analyzer", page_icon="💊", layout="wide")
 
-# Backend functions direct import (Sabse safe aur professional tareeqa)
+# Backend functions direct import
 try:
     from src.predict import predict_sentiment 
 except ImportError:
     st.error("Backend 'src/predict.py' not found. Please ensure your model logic is in the 'src' folder.")
+
+# --- MEDICAL ENTITY EXTRACTION LOGIC ---
+def extract_medical_entities(text):
+    # Common medical keywords dictionaries for matching
+    diseases_keywords = [
+        "asthma", "migraine", "headache", "back pain", "pain", "dizzy", "dizziness", 
+        "nausea", "nauseous", "blood pressure", "hypertension", "depression", 
+        "anxiety", "insomnia", "cough", "fever", "flu", "allergy", "diabetes"
+    ]
+    drugs_keywords = [
+        "medication", "medicine", "drug", "pill", "dose", "treatment", "aspirin", 
+        "ibuprofen", "paracetamol", "albuterol", "metformin", "xanax", "lipitor"
+    ]
+    
+    found_entities = []
+    text_lower = text.lower()
+    
+    # Extract Diseases
+    for disease in diseases_keywords:
+        if disease in text_lower:
+            # Capitalize first letters for clean look
+            found_entities.append({"Entity": disease.title(), "Type": "Disease / Symptom"})
+            
+    # Extract Drugs
+    for drug in drugs_keywords:
+        if drug in text_lower:
+            found_entities.append({"Entity": drug.title(), "Type": "Drug / Treatment"})
+            
+    return found_entities
 
 # Session State check karne ke liye (taake login yaad rahe)
 if 'logged_in' not in st.session_state:
@@ -48,7 +76,6 @@ if not st.session_state['logged_in']:
         new_password = st.text_input("Password", type='password')
         
         if st.button("Register"):
-            # Yahan register_user ko add_user se replace kar diya hai
             if add_user(new_user, new_password):
                 st.success("Account created successfully! Please login from the sidebar.")
             else:
@@ -58,7 +85,7 @@ if not st.session_state['logged_in']:
 # SCRIPT 2: AGAR USER LOGIN HAI (AAPKA ASAL ANALYZER CODE)
 # =========================================================
 else:
-    # Sidebar mein Logout Button lagane ke liye
+    # Sidebar mein Details
     with st.sidebar:
         st.title("Project Details")
         st.info("""
@@ -70,7 +97,7 @@ else:
         if st.button("Log Out", use_container_width=True):
             st.session_state['logged_in'] = False
             st.rerun()
-        st.write("v1.0.0 | Independent Project")
+        st.write("v1.1.0 | Feature Active")
 
     # --- Main UI ---
     st.title("💊 Medical NLP Analyzer")
@@ -105,11 +132,17 @@ else:
                 except Exception as e:
                     st.error(f"Prediction Error: {e}")
 
+                # 2. Real Medical Entity Extraction (Active Feature)
                 with col2:
-                    st.markdown("### 🔍 Medical Entities")
-                    # Placeholder for Entity Extraction
-                    st.info("Extracting drug names and medical conditions...")
-                    st.write("Entity extraction module is active.")
+                    st.markdown("### 🔍 Medical Entities Extracted")
+                    entities = extract_medical_entities(user_input)
+                    
+                    if entities:
+                        # Convert list to pandas DataFrame for beautiful table display
+                        df_entities = pd.DataFrame(entities)
+                        st.dataframe(df_entities, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No specific medical entities (Drugs/Diseases) detected in the text.")
                     
             st.divider()
             st.balloons()
